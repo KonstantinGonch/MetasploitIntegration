@@ -1,3 +1,4 @@
+using MetasploitIntegration.Services.Nmap;
 using MetasploitIntegration.Util;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -9,6 +10,7 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddDbContext<AppDataContext>();
+builder.Services.AddTransient<INMapService, NMapService>();
 
 var app = builder.Build();
 

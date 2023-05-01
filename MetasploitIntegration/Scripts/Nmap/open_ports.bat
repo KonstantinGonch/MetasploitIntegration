@@ -1,0 +1,1 @@
+nmap.exe %1 -Pn;
