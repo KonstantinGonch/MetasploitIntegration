@@ -1,33 +1,74 @@
-﻿using System;
+﻿using MetasploitIntegration.Util.NMap.ReportModels;
+using System;
 using System.Diagnostics;
 using System.Net;
+using System.Text;
 
 namespace MetasploitIntegration.Services.Nmap
 {
 	public class NMapService : INMapService
 	{
-		public async Task<string> ScanOpenPorts(IPAddress ipAddress)
+		private const int NmapLinesLimitIfFailed = 6;
+		private const int NmapLineNumberOpenedPorts = 5;
+		public async Task<OpenedPortsReportModel> ScanOpenPorts(IPAddress ipAddress)
 		{
-			var command = $"nmap.exe {ipAddress.ToString()}";
-			var cmdsi = new ProcessStartInfo("cmd.exe");
-			cmdsi.Arguments = command;
-			cmdsi.RedirectStandardOutput = true;
-			cmdsi.UseShellExecute = false;
-			var cmd = Process.Start(cmdsi);
-			var output = new List<string>();
-
-			while (cmd.StandardOutput.Peek() > -1)
+			var processInfo = new ProcessStartInfo()
 			{
-				output.Add(cmd.StandardOutput.ReadLine());
+				CreateNoWindow = true,
+				UseShellExecute = false,
+				RedirectStandardError = true,
+				RedirectStandardOutput = true,
+				FileName = "C:\\Program Files (x86)\\Nmap\\nmap.exe",
+				Arguments = $"{ipAddress.ToString()}"
+			};
+
+			StringBuilder sb = new StringBuilder();
+			Process p = Process.Start(processInfo);
+			p.OutputDataReceived += (sender, args) => sb.AppendLine(args.Data);
+			p.BeginOutputReadLine();
+			p.WaitForExit();
+			return ParseResponse(ipAddress, sb.ToString());
+		}
+
+		private OpenedPortsReportModel ParseResponse(IPAddress ip, string response)
+		{
+			var lines = response.Split("\n");
+			if (lines.Length < NmapLinesLimitIfFailed)
+			{
+				return new OpenedPortsReportModel
+				{
+					IsUp = false,
+					IpAddress = ip.ToString(),
+					RequestDate = DateTime.Now
+				};
 			}
 
-			while (cmd.StandardError.Peek() > -1)
+			var report = new OpenedPortsReportModel
 			{
-				output.Add(cmd.StandardError.ReadLine());
+				IsUp = true,
+				IpAddress = ip.ToString(),
+				RequestDate = DateTime.Now
+			};
+			var macLineNo = Array.IndexOf(lines, lines.FirstOrDefault(l => l.StartsWith("MAC")));
+			var openedPorts = new List<OpenedPortUnit>();
+			for (var i = NmapLineNumberOpenedPorts; i < macLineNo; i++)
+			{
+				var info = lines[i].Split().Where(el => el != String.Empty).ToArray();
+				var portInfo = info[0];
+				var serviceName = info[2];
+				var port = portInfo.Split("/")[0];
+				openedPorts.Add(new OpenedPortUnit
+				{
+					PortNumber = int.TryParse(port, out int v) ? v : 0,
+					ServiceName = serviceName,
+				});
 			}
-			cmd.WaitForExit();
+			report.OpenedPorts = openedPorts;
 
-			return String.Empty;
+			var mac = lines[macLineNo].Split(":", 2)[1].Trim();
+			report.MacAddress = mac;
+
+			return report;
 		}
 	}
 }

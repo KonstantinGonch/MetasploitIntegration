@@ -1,5 +1,6 @@
 ﻿using MetasploitIntegration.Services.Nmap;
 using MetasploitIntegration.Util;
+using MetasploitIntegration.Util.NMap.ReportModels;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Net;
@@ -23,7 +24,7 @@ namespace MetasploitIntegration.Controllers.Nmap
 		[Route("openPorts")]
 		public async Task<IActionResult> GetOpenPorts()
 		{
-			var response = new List<string>();
+			var response = new List<OpenedPortsReportModel>();
 			var environment = _context.Environments.FirstOrDefault(e => e.IsActive);
 			if (environment == null)
 				return BadRequest("No active environment");
